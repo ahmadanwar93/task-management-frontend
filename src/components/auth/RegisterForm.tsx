@@ -21,31 +21,39 @@ import {
 } from "../ui/form";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { loginSchema, type LoginFormSchema } from "@/types/login";
+import { registerSchema, type RegisterFormSchema } from "@/types/register";
 
-export function LoginForm() {
+export function RegisterForm() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { register } = useAuth();
 
-  const form = useForm<LoginFormSchema>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<RegisterFormSchema>({
+    resolver: zodResolver(registerSchema),
     defaultValues: {
+      name: "",
       email: "",
       password: "",
+      password_confirmation: "",
     },
   });
 
-  const onSubmit = async (values: LoginFormSchema) => {
+  const onSubmit = async (values: RegisterFormSchema) => {
     try {
-      await login(values.email, values.password);
-      toast.success("Login successful");
+      await register(
+        values.name,
+        values.email,
+        values.password,
+        values.password_confirmation
+      );
+      toast.success("Registration successful");
       navigate("/workspaces");
     } catch (error) {
       const apiError = error as ApiErrorResponse;
+      console.log(error);
       if (apiError.errors) {
         // for validation error from server side (failed validation from request validation sent from laravel)
         Object.entries(apiError.errors).forEach(([field, messages]) => {
-          form.setError(field as keyof LoginFormSchema, {
+          form.setError(field as keyof RegisterFormSchema, {
             type: "server",
             message: messages[0],
           });
@@ -60,12 +68,30 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>Login</CardTitle>
+        <CardTitle>Register</CardTitle>
         <CardDescription>Enter your credentials to continue</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      placeholder="John Doe"
+                      {...field}
+                      disabled={form.formState.isSubmitting}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="email"
@@ -103,13 +129,31 @@ export function LoginForm() {
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="password_confirmation"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Confirm Password</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      placeholder="••••••••"
+                      {...field}
+                      disabled={form.formState.isSubmitting}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <Button
               type="submit"
               className="w-full"
               disabled={form.formState.isSubmitting}
             >
-              {form.formState.isSubmitting ? "Logging in..." : "Login"}
+              {form.formState.isSubmitting ? "Registering..." : "Register"}
             </Button>
           </form>
         </Form>

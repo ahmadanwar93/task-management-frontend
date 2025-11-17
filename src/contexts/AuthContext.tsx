@@ -48,8 +48,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
+  const register = async (
+    name: string,
+    email: string,
+    password: string,
+    password_confirmation: string
+  ) => {
+    const response: ApiSuccessResponse<LoginResponse> = await apiClient.post(
+      "/register",
+      { name, email, password, password_confirmation }
+    );
+
+    const { user, token } = response.data;
+
+    localStorage.setItem("bearerToken", token);
+    localStorage.setItem("user", JSON.stringify(user));
+    setUser(user);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, register }}>
       {children}
     </AuthContext.Provider>
   );

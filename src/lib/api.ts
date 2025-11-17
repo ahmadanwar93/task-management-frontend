@@ -2,7 +2,7 @@ import type { ApiErrorResponse } from "@/types/api";
 import axios from "axios";
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.BASE_URL,
+  baseURL: import.meta.env.VITE_API_BASE_URL,
   headers: {
     "Content-Type": "application/json", // what we are sending
     Accept: "application/json", // what we are willing to receive back
