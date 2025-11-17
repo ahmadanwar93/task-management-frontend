@@ -3,13 +3,13 @@ import { Spinner } from "@/components/ui/spinner";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import apiClient from "@/lib/api";
 import type { ApiSuccessResponse } from "@/types/api";
-import type { Sprint } from "@/types/task";
 import { CalendarOff, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { SprintCard } from "./SprintCard";
 import { CreateSprintDialog } from "./CreateSprintDialog";
+import type { Sprint } from "@/types/sprint";
 
 export default function SprintIndex() {
   const { slug } = useParams(); // the slug from url query params are needed to get the sprints
