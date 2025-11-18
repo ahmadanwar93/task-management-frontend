@@ -25,17 +25,13 @@ export type Task = {
   };
 };
 
-export type Sprint = {
-  id: number;
-  workspace_id: number;
-  name: string;
-  status: "planned" | "active" | "completed";
-  start_date: string | null;
-  end_date: string | null;
-  is_eternal: boolean;
-  created_at: string;
-  updated_at: string;
-  days_remaining?: number | null;
-  days_elapsed?: number | null;
-  duration?: number | null;
+export type ViewMode = "kanban" | "table";
+
+export type TaskTableProps = {
+  tasks: Task[];
+  searchQuery: string;
+  statusFilter: string;
+  assignedToFilter: string;
+  onTaskClick: (taskId: number) => void;
+  onRefresh: () => void;
 };

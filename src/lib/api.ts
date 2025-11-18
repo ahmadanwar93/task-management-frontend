@@ -38,7 +38,12 @@ apiClient.interceptors.response.use(
         // for 401, we dont want the catch block at component to run
         return new Promise(() => {});
       }
-      return Promise.reject(error.response.data);
+      const apiError = {
+        ...error.response.data,
+        status: error.response.status,
+      };
+
+      return Promise.reject(apiError);
     } else {
       // server down error
       const networkError: ApiErrorResponse = {

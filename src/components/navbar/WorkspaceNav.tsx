@@ -25,9 +25,9 @@ export function WorkspaceNav() {
 
   return (
     <div className="flex items-center gap-6">
-      <div className="font-semibold text-lg">
+      <Link className="font-semibold text-lg" to={`/workspaces`}>
         {currentWorkspace?.name || "Workspace"}
-      </div>
+      </Link>
 
       <nav className="flex gap-1">
         {tabs.map((tab) => (

@@ -12,6 +12,7 @@ import { AuthenticatedLayout } from "./layouts/AuthenticatedLayout";
 import { NotFound } from "./pages/NotFound";
 import SprintIndex from "./pages/sprint/SprintIndex";
 import WorkspaceLayout from "./layouts/WorkspaceLayout";
+import { TaskBoardPage } from "./pages/task/TaskBoardPage";
 
 function App() {
   return (
@@ -47,8 +48,8 @@ function App() {
           <Route index element={<WorkspaceIndex />} />
           <Route path="/workspaces/:slug" element={<WorkspaceLayout />}>
             <Route index element={<SprintIndex />} />
-            {/* <Route path="tasks" element={<TaskBoardPage />} />
-            <Route path="backlog" element={<BacklogPage />} />
+            <Route path="sprints/:sprintId/tasks" element={<TaskBoardPage />} />
+            {/* <Route path="backlog" element={<BacklogPage />} />
             <Route path="history" element={<SprintHistoryPage />} />
             <Route
               path="settings"

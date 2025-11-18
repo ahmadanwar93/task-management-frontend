@@ -11,6 +11,7 @@ export interface ApiSuccessResponse<T> extends ApiResponse {
 export interface ApiErrorResponse extends ApiResponse {
   success: false;
   errors: null | { [key: string]: string[] };
+  status?: string;
 }
 
 export type Response<T> = ApiSuccessResponse<T> | ApiErrorResponse;

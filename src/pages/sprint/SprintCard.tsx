@@ -20,7 +20,7 @@ export function SprintCard({ sprint, onUpdate }: SprintCardProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const handleCardClick = () => {
-    navigate(`/workspaces/${slug}/tasks?sprint_id=${sprint.id}`);
+    navigate(`/workspaces/${slug}/sprints/${sprint.id}/tasks`);
   };
 
   const handleEditClick = (e: React.MouseEvent) => {
