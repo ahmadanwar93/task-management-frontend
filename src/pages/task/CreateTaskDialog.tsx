@@ -19,10 +19,9 @@ import {
 } from "@/components/ui/select";
 import type { Task } from "@/types/task";
 import type { ApiSuccessResponse } from "@/types/api";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import apiClient from "@/lib/api";
-import type { User } from "@/types/auth";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 interface CreateTaskDialogProps {
@@ -51,7 +50,6 @@ export function CreateTaskDialog({
   const [dueDate, setDueDate] = useState("");
 
   const members = currentWorkspace?.members || [];
-  console.log(members);
 
   const resetForm = () => {
     setTitle("");
@@ -60,7 +58,7 @@ export function CreateTaskDialog({
     setAssignedTo("");
     setDueDate("");
   };
-
+  // TODO: zod validation
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -107,7 +105,6 @@ export function CreateTaskDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Title */}
           <div className="space-y-2">
             <Label htmlFor="title">
               Title <span className="text-destructive">*</span>
@@ -121,7 +118,6 @@ export function CreateTaskDialog({
             />
           </div>
 
-          {/* Description */}
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
@@ -133,7 +129,6 @@ export function CreateTaskDialog({
             />
           </div>
 
-          {/* Status */}
           <div className="space-y-2">
             <Label htmlFor="status">Status</Label>
             <Select value={status} onValueChange={setStatus}>
@@ -149,7 +144,6 @@ export function CreateTaskDialog({
             </Select>
           </div>
 
-          {/* Assigned To */}
           <div className="space-y-2">
             <Label htmlFor="assigned-to">Assigned To</Label>
             <Select value={assignedTo} onValueChange={setAssignedTo}>
@@ -166,7 +160,6 @@ export function CreateTaskDialog({
             </Select>
           </div>
 
-          {/* Due Date */}
           <div className="space-y-2">
             <Label htmlFor="due-date">Due Date</Label>
             <Input

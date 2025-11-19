@@ -9,8 +9,8 @@ export function WorkspaceNav() {
   const location = useLocation();
 
   const tabs = [
-    { label: "Sprints", path: `/workspaces/${slug}`, exact: true },
-    { label: "Tasks", path: `/workspaces/${slug}/tasks` },
+    // { label: "Sprints", path: `/workspaces/${slug}`, exact: true },
+    // { label: "Tasks", path: `/workspaces/${slug}/tasks` },
     { label: "Backlog", path: `/workspaces/${slug}/backlog` },
     { label: "History", path: `/workspaces/${slug}/history` },
   ];

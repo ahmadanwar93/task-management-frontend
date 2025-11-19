@@ -61,7 +61,11 @@ export function TaskDataTable({ data, onRowClick }: TaskDataTableProps) {
         );
       },
       cell: ({ row }) => {
-        return <div className="font-medium">{row.getValue("title")}</div>;
+        return (
+          <p className="text-sm font-medium truncate">
+            {row.getValue("title")}
+          </p>
+        );
       },
     },
     {
@@ -113,10 +117,18 @@ export function TaskDataTable({ data, onRowClick }: TaskDataTableProps) {
       },
       filterFn: (row, columnId, value) => {
         const task = row.original;
+
+        // No filter - show all
+        if (!value) {
+          return true;
+        }
+
+        // Filter for unassigned
         if (value === "unassigned") {
           return !task.assigned_to;
         }
 
+        // Filter by user ID
         return task.assigned_to?.id === Number(value);
       },
     },
@@ -222,15 +234,11 @@ export function TaskDataTable({ data, onRowClick }: TaskDataTableProps) {
           value={
             (table.getColumn("assigned_to")?.getFilterValue() as string) ??
             "all"
-            // gets current filter value, will default to `all` if no filter is set
           }
-          onValueChange={
-            (value) =>
-              table
-                .getColumn("assigned_to")
-                ?.setFilterValue(value === "all" ? "" : value)
-            // if user selects all from the dropdown, the filter sets to ""
-            // else the filter is set to the value
+          onValueChange={(value) =>
+            table
+              .getColumn("assigned_to")
+              ?.setFilterValue(value === "all" ? "" : value)
           }
         >
           <SelectTrigger className="w-[180px]">
@@ -238,6 +246,7 @@ export function TaskDataTable({ data, onRowClick }: TaskDataTableProps) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Members</SelectItem>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
             {members.map((member) => (
               <SelectItem key={member.id} value={member.id.toString()}>
                 {member.name}

@@ -6,7 +6,6 @@ import { useParams } from "react-router-dom";
 import { format, addDays } from "date-fns";
 import apiClient from "@/lib/api";
 import type { ApiErrorResponse } from "@/types/api";
-// import type { Sprint } from "@/types/task";
 import { createSprintSchema, type CreateSprintFormData } from "@/types/sprint";
 import {
   Dialog,

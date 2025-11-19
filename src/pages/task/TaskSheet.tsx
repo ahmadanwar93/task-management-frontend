@@ -6,8 +6,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import {
   Select,
@@ -16,9 +14,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,32 +35,20 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { Task } from "@/types/task";
+import {
+  taskUpdateSchema,
+  type Task,
+  type TaskSheetProps,
+  type TaskUpdateFormData,
+} from "@/types/task";
 import { Calendar, Trash2, User as UserIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import apiClient from "@/lib/api";
 import type { ApiSuccessResponse } from "@/types/api";
-import type { User } from "@/types/auth";
-
-interface TaskSheetProps {
-  task: Task | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onTaskUpdated: (task: Task) => void;
-  onTaskDeleted: (taskId: number) => void;
-  workspaceSlug: string;
-}
-
-const getStatusColor = (status: string) => {
-  const colors: Record<string, string> = {
-    todo: "bg-gray-100 hover:bg-gray-600",
-    "in-progress": "bg-blue-300 hover:bg-blue-600",
-    backlog: "bg-yellow-300 hover:bg-yellow-600",
-    done: "bg-green-300 hover:bg-green-600",
-  };
-  return colors[status] || "bg-gray-500";
-};
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 export function TaskSheet({
   task,
@@ -65,67 +58,72 @@ export function TaskSheet({
   onTaskDeleted,
   workspaceSlug,
 }: TaskSheetProps) {
-  const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [members, setMembers] = useState<User[]>([]);
 
-  // Form state
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState("");
-  const [assignedTo, setAssignedTo] = useState<string>("");
-  const [dueDate, setDueDate] = useState("");
+  const { currentWorkspace } = useWorkspace();
+  const members = currentWorkspace?.members || [];
+
+  const form = useForm<TaskUpdateFormData>({
+    resolver: zodResolver(taskUpdateSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      status: "todo",
+      assigned_to: "",
+      due_date: "",
+    },
+  });
+  console.log(task);
+  // Watch status changes to automatically clear assigned_to when status is backlog
+  const currentStatus = form.watch("status");
 
   useEffect(() => {
+    if (currentStatus === "backlog") {
+      form.setValue("assigned_to", "");
+    }
+  }, [currentStatus, form]);
+
+  // Initialize form when task changes
+  useEffect(() => {
+    // it should be noted that on first render, although the task sheet is closed. The code still runs, hence task is null
     if (task) {
-      setTitle(task.title);
-      setDescription(task.description || "");
-      setStatus(task.status);
-      setAssignedTo(task.assigned_to?.toString() || "");
-      setDueDate(task.due_date || "");
+      const assigneeId = task.assigned_to?.id;
+
+      form.reset({
+        title: task.title,
+        description: task.description || "",
+        status: task.status,
+        assigned_to: assigneeId?.toString() || "",
+        due_date: task.due_date || "",
+      });
     }
   }, [task]);
 
-  useEffect(() => {
-    const fetchMembers = async () => {
-      try {
-        const response: ApiSuccessResponse<User[]> = await apiClient.get(
-          `/workspaces/${workspaceSlug}`
-        );
-        console.log(response);
-        setMembers(response.data);
-      } catch (error) {
-        console.error("Failed to fetch members:", error);
-      }
-    };
-
-    if (open) {
-      fetchMembers();
-    }
-  }, [workspaceSlug, open]);
-
-  const handleSave = async () => {
+  const onSubmit = async (values: TaskUpdateFormData) => {
     if (!task) return;
 
     try {
       setIsSaving(true);
 
       const payload = {
-        title,
-        description,
-        status,
-        assigned_to: assignedTo ? Number(assignedTo) : null,
-        due_date: dueDate || null,
+        title: values.title.trim(),
+        description: values.description?.trim() || null,
+        status: values.status,
+        assigned_to: values.assigned_to ? Number(values.assigned_to) : null,
+        due_date: values.due_date || null,
       };
 
-      const response: ApiSuccessResponse<Task> = await apiClient.put(
+      const response: ApiSuccessResponse<Task> = await apiClient.patch(
         `/workspaces/${workspaceSlug}/tasks/${task.id}`,
         payload
       );
 
+      // pass in the new task that gets updated, and the new state gets set
+      // kinda like optimisitc update
+      // so we dont have to refetch the task list
       onTaskUpdated(response.data);
-      setIsEditing(false);
+      onOpenChange(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to update task");
     } finally {
@@ -139,7 +137,10 @@ export function TaskSheet({
     try {
       setIsDeleting(true);
       await apiClient.delete(`/workspaces/${workspaceSlug}/tasks/${task.id}`);
+      // from our API, we dont return the deleted task. We return null for the data value
       onTaskDeleted(task.id);
+      onOpenChange(false);
+      toast.success("Task deleted successfully");
     } catch (error: any) {
       toast.error(error.message || "Failed to delete task");
     } finally {
@@ -147,173 +148,64 @@ export function TaskSheet({
     }
   };
 
-  const handleCancel = () => {
+  const handleDiscard = () => {
+    //when user change anything in the form, it is changing the form values, not the original task state
     if (task) {
-      setTitle(task.title);
-      setDescription(task.description || "");
-      setStatus(task.status);
-      setAssignedTo(task.assigned_to?.toString() || "");
-      setDueDate(task.due_date || "");
+      const assigneeId = task.assigned_to?.id;
+
+      form.reset({
+        title: task.title,
+        description: task.description || "",
+        status: task.status,
+        assigned_to: assigneeId?.toString() || "",
+        due_date: task.due_date || "",
+      });
     }
-    setIsEditing(false);
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open && form.formState.isDirty) {
+      const confirm = window.confirm(
+        "You have unsaved changes. Are you sure you want to close?"
+      );
+      if (!confirm) return;
+    }
+    onOpenChange(open);
   };
 
   if (!task) return null;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent className="sm:max-w-[540px] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>
-            {isEditing ? (
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="text-lg font-semibold"
-                placeholder="Task title"
+            <Form {...form}>
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Task title"
+                        className="text-lg font-semibold border-none px-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                        disabled={isSaving}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            ) : (
-              task.title
-            )}
+            </Form>
           </SheetTitle>
-          <SheetDescription>Task details and information</SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-6 px-4">
-          <div className="space-y-2">
-            <Label>Status</Label>
-            {isEditing ? (
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todo">To Do</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="backlog">Backlog</SelectItem>
-                  <SelectItem value="done">Done</SelectItem>
-                </SelectContent>
-              </Select>
-            ) : (
-              <Badge variant={"outline"}>
-                {task.status.replace("-", " ").toUpperCase()}
-              </Badge>
-            )}
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <Label htmlFor="assigned-to" className="flex items-center gap-2">
-              <UserIcon className="h-4 w-4" />
-              Assigned To
-            </Label>
-            {isEditing ? (
-              <Select value={assignedTo} onValueChange={setAssignedTo}>
-                <SelectTrigger id="assigned-to">
-                  <SelectValue placeholder="Select assignee" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
-                  {members.map((member) => (
-                    <SelectItem key={member.id} value={member.id.toString()}>
-                      {member.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : task.assigned_to_user ? (
-              <div className="flex items-center gap-3">
-                <Avatar className="h-8 w-8">
-                  <Avatar>
-                    {task.assigned_to_user.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase()}
-                  </Avatar>
-                </Avatar>
-                <div>
-                  <div className="font-medium">
-                    {task.assigned_to_user.name}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {task.assigned_to_user.email}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-muted-foreground">Unassigned</div>
-            )}
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <Label htmlFor="due-date" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Due Date
-            </Label>
-            {isEditing ? (
-              <Input
-                id="due-date"
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-              />
-            ) : task.due_date ? (
-              <div>{new Date(task.due_date).toLocaleDateString()}</div>
-            ) : (
-              <div className="text-muted-foreground">No due date</div>
-            )}
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            {isEditing ? (
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Add a description..."
-                rows={6}
-              />
-            ) : task.description ? (
-              <div className="text-sm whitespace-pre-wrap">
-                {task.description}
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                No description provided
-              </div>
-            )}
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <div>
-              <span className="font-medium">Created by:</span>{" "}
-              {task.created_by_user?.name || "Unknown"}
-            </div>
-            <div>
-              <span className="font-medium">Created at:</span>{" "}
-              {new Date(task.created_at).toLocaleString()}
-            </div>
-            <div>
-              <span className="font-medium">Updated at:</span>{" "}
-              {new Date(task.updated_at).toLocaleString()}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-4">
+          <SheetDescription className="flex justify-between">
+            Task details and information
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Task
+                <Button variant="ghost" size="icon">
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -321,7 +213,7 @@ export function TaskSheet({
                   <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This action cannot be undone. This will permanently delete
-                    the task.
+                    the task "{task.title}".
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -329,30 +221,175 @@ export function TaskSheet({
                   <AlertDialogAction
                     onClick={handleDelete}
                     disabled={isDeleting}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     {isDeleting ? "Deleting..." : "Delete"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+          </SheetDescription>
+        </SheetHeader>
 
-            <div className="flex gap-2">
-              {isEditing ? (
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-6 px-4"
+          >
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    disabled={isSaving}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="backlog">Backlog</SelectItem>
+                      <SelectItem value="todo">To Do</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="done">Done</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Separator />
+
+            <FormField
+              control={form.control}
+              name="assigned_to"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <UserIcon className="h-4 w-4" />
+                    Assigned To
+                    {currentStatus !== "backlog" && (
+                      <span className="text-destructive">*</span>
+                    )}
+                  </FormLabel>
+                  <Select
+                    onValueChange={(value) =>
+                      field.onChange(value === "unassigned" ? "" : value)
+                    }
+                    value={field.value || "unassigned"}
+                    disabled={isSaving || currentStatus === "backlog"}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select assignee" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {members.map((member) => (
+                        <SelectItem
+                          key={member.id}
+                          value={member.id.toString()}
+                        >
+                          {member.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {currentStatus === "backlog" && (
+                    <p className="text-xs text-muted-foreground">
+                      Assignee is not required for backlog tasks
+                    </p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Separator />
+
+            <FormField
+              control={form.control}
+              name="due_date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Due Date
+                  </FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} disabled={isSaving} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Separator />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      placeholder="Add a description..."
+                      rows={8}
+                      className="resize-none"
+                      disabled={isSaving}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Separator />
+
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <div>
+                <span className="font-medium">Created by:</span>{" "}
+                {typeof task.created_by === "object"
+                  ? task.created_by?.name
+                  : "-"}
+              </div>
+              <div>
+                <span className="font-medium">Created at:</span>{" "}
+                {new Date(task.created_at).toLocaleString()}
+              </div>
+              <div>
+                <span className="font-medium">Updated at:</span>{" "}
+                {new Date(task.updated_at).toLocaleString()}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              {form.formState.isDirty && (
                 <>
-                  <Button variant="outline" onClick={handleCancel}>
-                    Cancel
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleDiscard}
+                    disabled={isSaving}
+                  >
+                    Discard Changes
                   </Button>
-                  <Button onClick={handleSave} disabled={isSaving}>
+                  <Button type="submit" disabled={isSaving}>
                     {isSaving ? "Saving..." : "Save Changes"}
                   </Button>
                 </>
-              ) : (
-                <Button onClick={() => setIsEditing(true)}>Edit</Button>
               )}
             </div>
-          </div>
-        </div>
+          </form>
+        </Form>
       </SheetContent>
     </Sheet>
   );

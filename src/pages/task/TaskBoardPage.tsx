@@ -78,6 +78,7 @@ export function TaskBoardPage() {
   };
 
   const handleTaskUpdated = (updatedTask: Task) => {
+    console.log(updatedTask);
     setTasks((prev) =>
       prev.map((task) => (task.id === updatedTask.id ? updatedTask : task))
     );
