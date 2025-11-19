@@ -6,14 +6,13 @@ export type Task = {
   description: string | null;
   status: "backlog" | "todo" | "in_progress" | "done";
   due_date: string | null;
-  assigned_to: number | null;
   notes: string | null; // null since it is only visible to the owner
   order: number;
   created_by: number;
   completed_at: string | null;
   created_at: string;
   updated_at: string;
-  assigned_to_user?: {
+  assigned_to: {
     id: number;
     name: string;
     email: string;

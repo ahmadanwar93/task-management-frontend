@@ -2,59 +2,51 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import apiClient from "@/lib/api";
-import { cn } from "@/lib/utils";
 import type { ApiSuccessResponse } from "@/types/api";
 import type { Sprint } from "@/types/sprint";
-import type { Task, ViewMode } from "@/types/task";
-import { TableIcon } from "lucide-react";
+import type { Task } from "@/types/task";
+import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { TaskTable } from "./TaskTable";
+import { TaskDataTable } from "./TaskDataTable";
+import { TaskSheet } from "./TaskSheet";
+import { CreateTaskDialog } from "./CreateTaskDialog";
 
-// url structure /workspaces/{slug}/tasks?sprint_id={sprintId}
 export function TaskBoardPage() {
-  // useParams if for URL path (part of the route structure to be used for route matching)
   const { slug, sprintId } = useParams();
-  // url query parameters are key value pairs from query string
   const { currentWorkspace } = useWorkspace();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentSprint, setCurrentSprint] = useState<Sprint | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
-
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [assignedToFilter, setAssignedToFilter] = useState<string>("all");
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (currentWorkspace) {
+    if (currentWorkspace && sprintId) {
       fetchData();
     }
-  }, [sprintId]);
+  }, [sprintId, currentWorkspace]);
 
-  if (!sprintId) {
-    // the sprint id must exists by default since we are using the sprint id to match in app.tsx
-    // but we have to do this early return because sprintId might be null from TS
-    toast.error("Sprint id is required");
-
-    return;
-  }
   const fetchData = async () => {
+    if (!sprintId) {
+      toast.error("Sprint id is required");
+      return;
+    }
+
     try {
-      // we do try and catch because axios interceptor would throw error, we have to catch it
       setLoading(true);
+      // we have to make sure the sprint id is a valid one
       const sprintResponse: ApiSuccessResponse<Sprint> = await apiClient.get(
         `/workspaces/${slug}/sprints/${sprintId}`
       );
       setCurrentSprint(sprintResponse.data);
 
-      const params = new URLSearchParams();
-      params.append("sprint_id", sprintId);
+      // fetch all the tasks to pass to DataTable
       const taskResponse: ApiSuccessResponse<Task[]> = await apiClient.get(
-        `/workspaces/${slug}/tasks?${params.toString()}`
+        `/workspaces/${slug}/tasks?sprint_id=${sprintId}`
       );
       setTasks(taskResponse.data);
     } catch (err: any) {
@@ -73,6 +65,31 @@ export function TaskBoardPage() {
     }
   };
 
+  // once the row is clicked. We want to open the sheet with the selected task
+  // in the TableRow, we will pass in row.original which is the task object
+  const handleRowClick = (task: Task) => {
+    setSelectedTask(task);
+    setIsSheetOpen(true);
+  };
+
+  const handleTaskCreated = (newTask: Task) => {
+    setTasks((prev) => [...prev, newTask]);
+    toast.success("Task created successfully");
+  };
+
+  const handleTaskUpdated = (updatedTask: Task) => {
+    setTasks((prev) =>
+      prev.map((task) => (task.id === updatedTask.id ? updatedTask : task))
+    );
+    toast.success("Task updated successfully");
+  };
+
+  const handleTaskDeleted = (taskId: number) => {
+    setTasks((prev) => prev.filter((task) => task.id !== taskId));
+    setIsSheetOpen(false);
+    toast.success("Task deleted successfully");
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -80,72 +97,41 @@ export function TaskBoardPage() {
       </div>
     );
   }
-  return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          {currentWorkspace?.sprint_enabled && currentSprint && (
-            <SprintInfo sprint={currentSprint} onSprintComplete={fetchData} />
-          )}
-        </div>
 
-        <div className="flex items-center gap-2 border rounded-lg p-1">
-          <Button
-            variant={viewMode === "kanban" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("kanban")}
-            className={"gap-2"}
-          >
-            <LayoutGrid className="h-4 w-4" />
-            Board
-          </Button>
-          <Button
-            variant={viewMode === "table" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("table")}
-            className={cn("gap-2")}
-          >
-            <TableIcon className="h-4 w-4" />
-            Table
-          </Button>
+  return (
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {currentSprint?.name || "Sprint Tasks"}
+          </h1>
+          <p className="text-muted-foreground">
+            Manage and track tasks for this sprint
+          </p>
         </div>
+        <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Task
+        </Button>
       </div>
 
-      <TaskFilters
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        statusFilter={statusFilter}
-        onStatusChange={setStatusFilter}
-        assignedToFilter={assignedToFilter}
-        onAssignedToChange={setAssignedToFilter}
+      <TaskDataTable data={tasks} onRowClick={handleRowClick} />
+
+      <TaskSheet
+        task={selectedTask}
+        open={isSheetOpen}
+        onOpenChange={setIsSheetOpen}
+        onTaskUpdated={handleTaskUpdated}
+        onTaskDeleted={handleTaskDeleted}
+        workspaceSlug={slug!}
       />
 
-      {viewMode === "kanban" ? (
-        <KanbanBoard
-          tasks={tasks}
-          onTasksChange={setTasks}
-          searchQuery={searchQuery}
-          statusFilter={statusFilter}
-          assignedToFilter={assignedToFilter}
-          onRefresh={fetchData}
-          onTaskClick={setSelectedTaskId}
-        />
-      ) : (
-        <TaskTable
-          tasks={tasks}
-          searchQuery={searchQuery}
-          statusFilter={statusFilter}
-          assignedToFilter={assignedToFilter}
-          onTaskClick={setSelectedTaskId}
-          onRefresh={fetchData}
-        />
-      )}
-
-      <TaskDetailSheet
-        taskId={selectedTaskId}
-        open={!!selectedTaskId}
-        onOpenChange={(open) => !open && setSelectedTaskId(null)}
-        onTaskUpdate={fetchData}
+      <CreateTaskDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onTaskCreated={handleTaskCreated}
+        sprintId={Number(sprintId)}
+        workspaceSlug={slug!}
       />
     </div>
   );
